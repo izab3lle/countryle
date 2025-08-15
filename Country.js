@@ -11,6 +11,11 @@ export default class Country {
     distanceTo(country) {
         return this.long;
     }
+
+    toHTML() {
+        let message = document.querySelector("#message");
+        message.innerHTML = this.name;
+    }
 }
 
 //  hemisfério, continente, população e coordenadas.
