@@ -1,7 +1,7 @@
 export default class Country {
     constructor(name, hemisphere, continent, population, lat, long) {
         this.name = name;
-        this.hemisphere = hemisphere;
+        this.hemisphere = (lat > 0) ? "North" : "South";
         this.continent = continent;
         this.population = population;
         this.lat = lat;
