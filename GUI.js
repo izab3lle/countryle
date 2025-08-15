@@ -9,13 +9,61 @@ class GUI {
         this.allCountries = new Array();
     }
 
+    getCardinal(c1, c2) {
+        let directions = {
+            leste: { number: 0, arrow:"→"},
+            nordeste: { number: 45, arrow:"↗"},
+            norte: { number: 90, arrow:"↑"},
+            noroeste: { number: 135, arrow:"↖"},
+            oeste: { number: 180, arrow:"←"},
+            sudoeste: { number: 255, arrow:"↙"},
+            sul: { number: 270, arrow:"↓"},
+            sudeste: { number: 315, arrow:"↘"},
+        }
+        
+        let angle = Math.atan2(c2.lat - c1.lat, c2.long - c1.long) * 180 / Math.PI;
+        let direction;
+        for(let key in directions) {
+            if(angle > directions[key]["number"]) {
+                direction = directions[key]["arrow"];
+            }
+        }
+
+        console.log(angle, direction);
+
+        return direction;
+    }
+
     showCountry(country) {
-        let win = false;
-        let answer = {...localStorage};
         let changeMessage = (text) => {
             let message = document.querySelector("#message");
             message.innerHTML = text;
         }
+
+        let printCountry = (fieldColors, country) => {
+            for (let key in country) {
+                let field = document.createElement("div");
+                field.className = `country-field ${fieldColors[key]}`;
+
+                let info = document.createElement("p");
+                info.textContent = country[key];
+                if(key == "direction") info.id = "direction";
+
+                let label = document.createElement("p");
+                label.textContent = key;
+                label.className = "country-label";
+
+                field.appendChild(label);
+                field.appendChild(info);
+                li.appendChild(field);
+            }
+
+            ul.appendChild(li);
+        }
+
+        let win = false;
+        let lose = false;
+        let answer = {...localStorage};
 
         if(country == undefined) {
             changeMessage("Erro: O país não existe!");
@@ -26,6 +74,27 @@ class GUI {
             changeMessage(`Acertou! O país é ${country.name}`);
             win = true;
         }
+
+        if (localStorage.attempts >= 5) {
+            changeMessage(`Fim de jogo! O país é ${answer.name}`);
+            lose = true;
+        }
+        
+        // Limpando o que ficou do localStorage
+        Object.keys(answer).map(key => { if (!Object.keys(country).includes(key)) delete answer[key] });
+        
+        let c1 = {
+            lat: country.lat,
+            long: country.long
+        }
+
+        let c2 = {
+            lat: answer.lat,
+            long: answer.long
+        }
+
+        // Calculando a direção
+        country["direction"] = this.getCardinal(c1, c2);
 
         let ul = document.querySelector("#attempts");
         let li = document.createElement("li");
@@ -39,6 +108,15 @@ class GUI {
 
         let fieldColors = {};
         for(let key in country) {
+            if(win) {
+                fieldColors[key] = colors.right;
+                continue;
+            }
+
+            if(lose) {
+                fieldColors[key] = colors.default;
+                continue;
+            }
             
             if(key == "hemisphere" || key == "continent") {
                 (country[key] == answer[key]) ? fieldColors[key] = colors.right : fieldColors[key] = colors.wrong;
@@ -46,13 +124,18 @@ class GUI {
             }
             
             if(key == "population") {
-                let difference = (country[key] / answer[key]) * 100;
-                if(difference <= 20) {
+                let difference = ((country[key] / answer[key]));
+                console.log(`${country[key]} / ${answer[key]} = ${difference}`);
+                
+                if(difference >= 0.8 || difference <= 1.2) {
                     fieldColors[key] = colors.right;
-                } else if(difference <= 40) {
+                } else if(difference >= 0.6 || difference <= 1.4) {
                     fieldColors[key] = colors.mid;
                 } else {
-                    fieldColors[key] = colors.wrong
+                    fieldColors[key] = colors.wrong;
+                }
+                if(difference == Infinity) {
+                    fieldColors[key] = colors.wrong;
                 }
                 continue;
             }
@@ -64,23 +147,12 @@ class GUI {
 
         delete country["name"];
         
-        for(let key in country) {
-            let field = document.createElement("div");
-            field.className = `country-field ${fieldColors[key]}`;
-            
-            let info = document.createElement("p");
-            info.textContent = country[key];
-            
-            let label = document.createElement("p");
-            label.textContent = key;
-            label.className = "country-label";
-            
-            field.appendChild(label);
-            field.appendChild(info);
-            li.appendChild(field);
-        }
+        printCountry(fieldColors, country);
+        localStorage.setItem("attempts", Number(answer.attempts) + 1);
 
-        ul.appendChild(li);
+        if(lose) {
+            printCountry(answer);
+        }
     }
 
     dbAction(object, action) {
@@ -90,7 +162,7 @@ class GUI {
         }
         let allCountries = object;
 
-        let compare = this.showCountry;
+        let compare = this.showCountry.bind(this);
         
         let openRequest = indexedDB.open("countries", 1);
         openRequest.onupgradeneeded = function () {
@@ -203,12 +275,14 @@ class GUI {
         let listInput = document.querySelector("#selected-country");
         let country = listInput.value;
         listInput.value = "";
+        console.log(localStorage.getItem("attempts"));
 
         if(!country.trim().length) console.error("País vazio");
         this.dbAction(country, DB_Actions.GET);
     }
 
     init() {        
+        localStorage.setItem("attempts", 0);
         let dbExists = localStorage.getItem("hasList");
         if(!dbExists) {
             this.fetchAllCountries();
@@ -219,12 +293,12 @@ class GUI {
         let inputList = document.querySelector("#selected-country");
         let button = document.querySelector("button");
 
-        inputList.addEventListener("keydown", (event) => {
+        inputList.addEventListener(["keydown"], (event) => {
             if(event.code == "Enter"){
+                console.log(event.code);
                 event.preventDefault();
                 this.play.bind(this);
             }
-
             inputList.innerHTML = "";
         });
 
