@@ -38,7 +38,6 @@ class GUI {
         }
 
         ul.appendChild(li);
-        console.log("??");
     }
 
     dbAction(object, action) {
@@ -46,6 +45,7 @@ class GUI {
             let message = document.querySelector("#message");
             message.innerHTML = `Erro: ${text}`;
         }
+        let allCountries = object;
 
         let compare = this.showCountry;
         
@@ -65,10 +65,10 @@ class GUI {
             let db = openRequest.result;
             let transaction = db.transaction("countries", "readwrite");
             let request = transaction.objectStore("countries");
-
+            
             switch(action) {
                 case DB_Actions.POPULATE:
-                    let allCountries = object;
+                    console.log("popular");
                     allCountries.map(country => {
                         let countriesReq = request.add(country);
         
@@ -81,21 +81,38 @@ class GUI {
                     //localStorage.setItem("hasDB", "yes");
                     break;
 
-                case DB_Actions.GET_ALL:
+                case DB_Actions.SETUP_GAME:
                     let allReq = request.getAll();
+                    let datalist = document.querySelector("datalist");
+
+                    let randomNum = () => {
+                        return parseInt(Math.random() * 255);
+                    }
 
                     allReq.onsuccess = function () {
-                        if(allReq.result.length == 0) return false;
+                        if(allReq.result.length < 1) {
+                            localStorage.removeItem("hasList")
+                            console.log("result", allReq.result);
+                            return;
+                        }
                         
-                        let datalist = document.querySelector("datalist");
+                        // Preenche datalist
                         allReq.result.map(c => {
                             let option = document.createElement("option");
                             option.value = c.name;
                             datalist.appendChild(option);
                         });
+
+                        localStorage.setItem("hasList", "true");
+
+                        let selectedCountry = allReq.result[randomNum()];
+                        for (let key in selectedCountry) {
+                            localStorage.setItem(key, selectedCountry[key]);
+                        }
+                        
                     }
                     allReq.onerror = function () { changeMessage(allReq.error); }
-                    return true;
+
                     break;
 
                 case DB_Actions.GET:
@@ -106,78 +123,8 @@ class GUI {
                     getReq.onerror = function () { changeMessage(getReq.error); }
                     
                     break;
-
                 default:
                     break;
-            }
-        }
-
-        openRequest.onerror = function () {
-            let message = document.querySelector("#message");
-            message.innerHTML += `Erro: ${openRequest.error}`;
-            return;
-        };
-    }
-
-    storeCountries(allCountries) {
-        let openRequest = indexedDB.open("countries", 1);
-        openRequest.onupgradeneeded = function () {
-            let db = openRequest.result;
-            switch (event.oldVersion) {
-                case 0:
-                    db.createObjectStore("countries", { keyPath: 'name' });
-                    break;
-                default:
-                    return;
-            }
-        };
-
-        openRequest.onsuccess = function () {
-            let db = openRequest.result;
-            let transaction = db.transaction("countries", "readwrite");
-            let countries = transaction.objectStore("countries");
-
-            allCountries.map(country => {
-                let request = countries.add(country);
-
-                request.onsuccess = function () {
-                    console.log("País entrou no banco", request.result);
-                };
-
-                request.onerror = function () {
-                    let message = document.querySelector("#message");
-                    message.innerHTML = `Erro: ${request.error}`;
-                };
-            });
-
-            localStorage.setItem("hasDB", "yes");
-        }
-        
-        openRequest.onerror = function () {
-            let message = document.querySelector("#message");
-            message.innerHTML += `Erro: ${openRequest.error}`;
-            return;
-        };
-    }
-
-    getCountry(name) {
-        let openRequest = indexedDB.open("countries", 1);
-
-        let compare = this.compare;
-        openRequest.onupgradeneeded = function () { };
-
-        openRequest.onsuccess = function () {
-            let db = openRequest.result;
-            let transaction = db.transaction("countries", "readonly");
-            let request = transaction.objectStore("countries");
-            request = request.get(name);
-
-            request.onsuccess = function () {
-                compare(request.result);
-            }
-
-            request.onerror = function () {
-                return undefined;
             }
         }
 
@@ -189,7 +136,7 @@ class GUI {
     }
 
     fetchAllCountries() {
-        let store = this.dbAction;
+        let store = this.dbAction.bind(this);
         
         let restCountriesURL = "https://restcountries.com/v3.1/all?fields=name,region,continents,population,latlng"
         let p = fetch(restCountriesURL, { method: 'GET' });
@@ -199,54 +146,14 @@ class GUI {
         p.then(response => response.json()).then(function (countries) {
             countries.sort((c) => c.name.common);
             countries.map((c) => {
-                let country = new Country(c.name.common, c.region,
-                                          c.continents[0], c.population,
-                                          c.latlng[0], c.latlng[1]);
+                let country = new Country(c.name.common, c.continents[0], c.population,
+                                          c.latlng[0].toFixed(3), c.latlng[1].toFixed(3));
 
                 allCountries.push(country);
             });
 
             store(allCountries, DB_Actions.POPULATE);
         });
-    }
-   
-    setAllCountries() {
-        let openRequest = indexedDB.open("countries", 1);
-        openRequest.onupgradeneeded = function () {
-            let db = openRequest.result;
-            console.log(event.oldVersion);
-            switch (event.oldVersion) {
-                case 0:
-                    db.createObjectStore("countries", { keyPath: 'name' });
-                    break;
-                default:
-                    return;
-            }
-        };
-
-        openRequest.onsuccess = function () {
-            let db = openRequest.result;
-            let transaction = db.transaction("countries", "readonly");
-            let request = transaction.objectStore("countries");
-            request = request.getAll();
-            
-            request.onsuccess = function () {
-                let datalist = document.querySelector("datalist");
-                request.result.map(c => {
-                    let option = document.createElement("option");
-                    option.value = c.name;
-                    datalist.appendChild(option);
-                });
-            }
-
-            return true;
-        }
-
-        openRequest.onerror = function () {
-            let message = document.querySelector("#message");
-            message.innerHTML += `Erro: ${openRequest.error}`;
-            return false;
-        };
     }
 
     play(event) {
@@ -255,19 +162,18 @@ class GUI {
         listInput.value = "";
 
         if(!country.trim().length) console.error("País vazio");
-        country = this.dbAction(country, DB_Actions.GET);
+        this.dbAction(country, DB_Actions.GET);
     }
 
-    init() {
-        if(!this.dbAction(null, DB_Actions.GET_ALL)) {
-            this.fetchAllCountries();
-            this.dbAction(null, DB_Actions.GET_ALL);
-        }
+    init() {        
+        let dbExists = localStorage.getItem("hasList");
         
-        //if(!this.setAllCountries()) {
-        //    this.fetchAllCountries();
-        //}
-    
+        if(!dbExists) {
+            this.fetchAllCountries();
+        }
+
+        this.dbAction(null, DB_Actions.SETUP_GAME);    // Preenche o datalist  
+        
         let inputList = document.querySelector("#selected-country");
         let button = document.querySelector("button");
 
@@ -281,8 +187,6 @@ class GUI {
         });
 
         button.onclick = this.play.bind(this);
-        this.setAllCountries.bind(this);
-        //console.log(this.allCountries);
     }
 
 }

@@ -1,5 +1,5 @@
 export default {
     POPULATE: "POPULATE",
-    GET_ALL: "GET_ALL",
+    SETUP_GAME: "SETUP_GAME",
     GET: "GET",
 }
