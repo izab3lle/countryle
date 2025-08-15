@@ -10,20 +10,63 @@ class GUI {
     }
 
     showCountry(country) {
-        if(country == undefined) {
+        let win = false;
+        let answer = {...localStorage};
+        let changeMessage = (text) => {
             let message = document.querySelector("#message");
-            message.innerHTML = `Erro: O país não existe!`;
+            message.innerHTML = text;
+        }
+
+        if(country == undefined) {
+            changeMessage("Erro: O país não existe!");
             return;
+        }
+
+        if(country.name == localStorage.getItem("name")) {
+            changeMessage(`Acertou! O país é ${country.name}`);
+            win = true;
         }
 
         let ul = document.querySelector("#attempts");
         let li = document.createElement("li");
 
+        let colors = {
+            wrong: "red",
+            right: "green",
+            mid: "yellow",
+            default: "blue"
+        }
+
+        let fieldColors = {};
+        for(let key in country) {
+            
+            if(key == "hemisphere" || key == "continent") {
+                (country[key] == answer[key]) ? fieldColors[key] = colors.right : fieldColors[key] = colors.wrong;
+                continue;
+            }
+            
+            if(key == "population") {
+                let difference = (country[key] / answer[key]) * 100;
+                if(difference <= 20) {
+                    fieldColors[key] = colors.right;
+                } else if(difference <= 40) {
+                    fieldColors[key] = colors.mid;
+                } else {
+                    fieldColors[key] = colors.wrong
+                }
+                continue;
+            }
+
+            fieldColors[key] = colors.default;
+        }
+
+        //console.log(fieldColors);
+
         delete country["name"];
         
         for(let key in country) {
             let field = document.createElement("div");
-            field.className = "country-field red";
+            field.className = `country-field ${fieldColors[key]}`;
             
             let info = document.createElement("p");
             info.textContent = country[key];
@@ -167,7 +210,6 @@ class GUI {
 
     init() {        
         let dbExists = localStorage.getItem("hasList");
-        
         if(!dbExists) {
             this.fetchAllCountries();
         }
