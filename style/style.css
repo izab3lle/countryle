@@ -134,3 +134,7 @@ form button {
     border-radius: 60%;
     background-color: rgba(0, 0, 0, 0);
 }
+
+form.hide {
+    display: none;
+}

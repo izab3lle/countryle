@@ -1,6 +1,7 @@
 import Country from "./Country.js";
 import DB_Actions from "./DB_Actions.js";
 import Arrows from "./Arrows.js";
+import Directions from "./Directions.js";
 
 class GUI {
     constructor() {
@@ -11,24 +12,13 @@ class GUI {
     }
 
     getCardinal(c1, c2) {
-        let directions = {
-            leste: { number: 0, arrow: Arrows.leste },
-            nordeste: { number: 45, arrow: Arrows.nordeste },
-            norte: { number: 90, arrow: Arrows.norte },
-            noroeste: { number: 135, arrow: Arrows.noroeste },
-            oeste: { number: 180, arrow: Arrows.oeste },
-            sudoeste: { number: 255, arrow: Arrows.sudoeste },
-            sul: { number: 270, arrow: Arrows.sul },
-            sudeste: { number: 315, arrow: Arrows.sudeste },
-        }
-        
         let angle = Math.atan2(c2.lat - c1.lat, c2.long - c1.long) * 180 / Math.PI;
         angle = (angle + 360) % 360;
 
-        let direction = directions["norte"]["arrow"];
-        for(let key in directions) {
-            if(angle > directions[key]["number"]) {
-                direction = directions[key]["arrow"];
+        let direction = Directions["norte"]["arrow"];
+        for (let key in Directions) {
+            if (angle > Directions[key]["number"]) {
+                direction = Directions[key]["arrow"];
             }
         }
 
@@ -44,21 +34,33 @@ class GUI {
         }
 
         let printCountry = (fieldColors, country) => {
+            let ul = document.querySelector("#attempts");
+            let li = document.createElement("li");
+
             for (let key in country) {
                 let field = document.createElement("div");
                 field.className = `country-field ${fieldColors[key]}`;
 
                 let info = document.createElement("p");
-                info.innerHTML = country[key];
+                info.innerHTML = country[key] + "\n";
                 
                 if(key == "direction") {
                     info.id = "direction";
                 } else {
                     let label = document.createElement("p");
-                    label.textContent = key;
                     label.className = "country-label";
+                    label.textContent = key;
                     field.appendChild(label);
+
+                    if(key == "population") {
+                        if(country[key] > answer[key]) {
+                            info.innerHTML += Arrows.popUp;
+                        } else if (country[key] < answer[key]) {
+                            info.innerHTML += Arrows.popDown;
+                        }
+                    }
                 }
+
 
                 field.appendChild(info);
                 li.appendChild(field);
@@ -74,13 +76,18 @@ class GUI {
         if(country == undefined) {
             changeMessage("Erro: O país não existe!");
             return;
+        } else {
+            let datalist = document.querySelector("datalist");
+            datalist = Array.from(datalist.childNodes);
+            let c = datalist.filter((n) => n.value == country.name);
+            
+            try {
+                c[0].remove();
+            } catch(er) {
+                console.error(err);
+            }
         }
-
-        if(country.name == localStorage.getItem("name")) {
-            changeMessage(`Acertou! O país é ${country.name}`);
-            win = true;
-        }
-
+        
         if (localStorage.attempts > 5) {
             changeMessage(`Fim de jogo! O país é ${answer.name}. Recarregue a página para jogar mais uma vez.`);
             return;
@@ -88,6 +95,12 @@ class GUI {
 
         localStorage.setItem("attempts", Number(answer.attempts) + 1);
         console.log(localStorage.getItem("attempts"));
+
+        if(country.name == localStorage.getItem("name")) {
+            changeMessage(`Acertou! O país é ${country.name}`);
+            localStorage.setItem("attempts", 6);
+            win = true;
+        }
         
         // Limpando o que ficou do localStorage
         Object.keys(answer).map(key => { if (!Object.keys(country).includes(key)) delete answer[key] });
@@ -104,9 +117,6 @@ class GUI {
 
         // Calculando a direção
         country["direction"] = this.getCardinal(c1, c2);
-
-        let ul = document.querySelector("#attempts");
-        let li = document.createElement("li");
 
         let colors = {
             wrong: "red",
@@ -131,9 +141,9 @@ class GUI {
                 let difference = ((country[key] / answer[key]));
                 console.log(`${country[key]} / ${answer[key]} = ${difference}`);
                 
-                if(difference >= 0.8 || difference <= 1.2) {
+                if(difference >= 0.8 && difference <= 1.2) {
                     fieldColors[key] = colors.right;
-                } else if(difference >= 0.6 || difference <= 1.4) {
+                } else if(difference >= 0.6 && difference <= 1.4) {
                     fieldColors[key] = colors.mid;
                 } else {
                     fieldColors[key] = colors.wrong;
@@ -147,14 +157,16 @@ class GUI {
             fieldColors[key] = colors.default;
         }
 
-        delete country["name"];
+        win ? delete country["direction"] : delete country["name"];
 
         printCountry(fieldColors, country);
 
         if (localStorage.attempts > 5 && !win) {
             changeMessage(`Fim de jogo! O país é ${answer.name}`);
-            lose = true;
-            winColors = fieldColors.keys().map((key) => fieldColors[key] = colors.right);
+            let winColors = fieldColors;
+            Object.keys(fieldColors).forEach((key) => winColors[key] = colors.right);
+            
+            delete answer.direction;
             printCountry(winColors, answer);
         }
     }
