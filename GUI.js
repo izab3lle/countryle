@@ -180,13 +180,40 @@ class GUI {
         let allCountries = object;
 
         let compare = this.showCountry.bind(this);
-        
+        let setupGame = this.dbAction.bind(this, null, DB_Actions.SETUP_GAME);
+
         let openRequest = indexedDB.open("countries", 1);
+
         openRequest.onupgradeneeded = function (event) {
             let db = openRequest.result;
             switch (event.oldVersion) {
                 case 0:
                     db.createObjectStore("countries", { keyPath: 'name' });
+                    let restCountriesURL = "https://restcountries.com/v3.1/all?fields=name,region,continents,population,latlng";
+                    fetch(restCountriesURL, { method: 'GET' })
+                        .then(response => response.json())
+                        .then(countries => {
+                            let transaction = db.transaction("countries", "readwrite");
+                            let request = transaction.objectStore("countries");
+                            countries.sort((c) => c.name.common);
+                            countries.map(c => {
+                                let country = new Country(c.name.common, c.continents[0], c.population,
+                                                          c.latlng[0].toFixed(3), c.latlng[1].toFixed(3));
+                                request.add(country);
+                            });
+
+                            transaction.oncomplete = () => {
+                                console.log("Banco de dados populado com sucesso.");
+                                setupGame();
+                            };
+
+                            transaction.onerror = (e) => {
+                                console.error("Erro ao popular o banco de dados:", e.target.error);
+                            };
+                        })
+                        .catch(error => console.error("Erro ao buscar países da API:", error));
+                    break;
+                case 1:
                     break;
                 default:
                     return;
@@ -197,22 +224,8 @@ class GUI {
             let db = openRequest.result;
             let transaction = db.transaction("countries", "readwrite");
             let request = transaction.objectStore("countries");
-            
-            switch(action) {
-                case DB_Actions.POPULATE:
-                    console.log("popular");
-                    allCountries.map(country => {
-                        let countriesReq = request.add(country);
-        
-                        countriesReq.onsuccess = function () {
-                            console.log("País entrou no banco", countriesReq.result);
-                        };
-                        countriesReq.onerror = function () { changeMessage(countriesReq.error); };
-                    });
-        
-                    //localStorage.setItem("hasDB", "yes");
-                    break;
 
+            switch (action) {
                 case DB_Actions.SETUP_GAME:
                     let allReq = request.getAll();
                     let datalist = document.querySelector("datalist");
@@ -222,29 +235,25 @@ class GUI {
                     }
 
                     allReq.onsuccess = function () {
-                        if(allReq.result.length < 1) {
-                            localStorage.removeItem("hasList")
-                            console.log("result", allReq.result);
+                        if (allReq.result.length === 0) {
+                            console.log("Banco de dados vazio!");
                             return;
                         }
-                        
-                        // Preenche datalist
+
+                        // Preenchendo datalist
                         allReq.result.map(c => {
                             let option = document.createElement("option");
                             option.value = c.name;
                             datalist.appendChild(option);
                         });
 
-                        localStorage.setItem("hasList", "true");
-
+                        // Escolha aleatória do país
                         let selectedCountry = allReq.result[randomNum()];
                         for (let key in selectedCountry) {
                             localStorage.setItem(key, selectedCountry[key]);
                         }
-                        
                     }
-                    allReq.onerror = function () { changeMessage(allReq.error); }
-
+                    allReq.onerror = function () { console.error(allReq.error); }
                     break;
 
                 case DB_Actions.GET:
@@ -252,9 +261,9 @@ class GUI {
                     let getReq = request.get(country);
 
                     getReq.onsuccess = function () { compare(getReq.result); }
-                    getReq.onerror = function () { changeMessage(getReq.error); }
-                    
+                    getReq.onerror = function () { console.error(getReq.error); }
                     break;
+
                 default:
                     break;
             }
@@ -262,7 +271,7 @@ class GUI {
 
         openRequest.onerror = function () {
             let message = document.querySelector("#message");
-            message.innerHTML += `Erro: ${openRequest.error}`;
+            message.innerHTML = `Erro: ${openRequest.error}`;
             return;
         };
     }
@@ -299,11 +308,6 @@ class GUI {
 
     init() {        
         localStorage.setItem("attempts", "0");
-        let dbExists = localStorage.getItem("hasList");
-        if(!dbExists) {
-            this.fetchAllCountries();
-        }
-
         this.dbAction(null, DB_Actions.SETUP_GAME);    // Preenche o datalist  
         
         let inputList = document.querySelector("#selected-country");
@@ -313,9 +317,8 @@ class GUI {
             if(event.code == "Enter"){
                 console.log(event.code);
                 event.preventDefault();
-                this.play.bind(this);
+                this.play.bind(this)();
             }
-            inputList.innerHTML = "";
         });
 
         button.onclick = this.play.bind(this);
