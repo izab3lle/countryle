@@ -1,5 +1,6 @@
 import Country from "./Country.js";
 import DB_Actions from "./DB_Actions.js";
+import Arrows from "./Arrows.js";
 
 class GUI {
     constructor() {
@@ -11,25 +12,27 @@ class GUI {
 
     getCardinal(c1, c2) {
         let directions = {
-            leste: { number: 0, arrow:"→"},
-            nordeste: { number: 45, arrow:"↗"},
-            norte: { number: 90, arrow:"↑"},
-            noroeste: { number: 135, arrow:"↖"},
-            oeste: { number: 180, arrow:"←"},
-            sudoeste: { number: 255, arrow:"↙"},
-            sul: { number: 270, arrow:"↓"},
-            sudeste: { number: 315, arrow:"↘"},
+            leste: { number: 0, arrow: Arrows.leste },
+            nordeste: { number: 45, arrow: Arrows.nordeste },
+            norte: { number: 90, arrow: Arrows.norte },
+            noroeste: { number: 135, arrow: Arrows.noroeste },
+            oeste: { number: 180, arrow: Arrows.oeste },
+            sudoeste: { number: 255, arrow: Arrows.sudoeste },
+            sul: { number: 270, arrow: Arrows.sul },
+            sudeste: { number: 315, arrow: Arrows.sudeste },
         }
         
         let angle = Math.atan2(c2.lat - c1.lat, c2.long - c1.long) * 180 / Math.PI;
-        let direction;
+        angle = (angle + 360) % 360;
+
+        let direction = directions["norte"]["arrow"];
         for(let key in directions) {
             if(angle > directions[key]["number"]) {
                 direction = directions[key]["arrow"];
             }
         }
 
-        console.log(angle, direction);
+        console.log("angulo", angle);
 
         return direction;
     }
@@ -46,14 +49,17 @@ class GUI {
                 field.className = `country-field ${fieldColors[key]}`;
 
                 let info = document.createElement("p");
-                info.textContent = country[key];
-                if(key == "direction") info.id = "direction";
+                info.innerHTML = country[key];
+                
+                if(key == "direction") {
+                    info.id = "direction";
+                } else {
+                    let label = document.createElement("p");
+                    label.textContent = key;
+                    label.className = "country-label";
+                    field.appendChild(label);
+                }
 
-                let label = document.createElement("p");
-                label.textContent = key;
-                label.className = "country-label";
-
-                field.appendChild(label);
                 field.appendChild(info);
                 li.appendChild(field);
             }
@@ -75,10 +81,13 @@ class GUI {
             win = true;
         }
 
-        if (localStorage.attempts >= 5) {
-            changeMessage(`Fim de jogo! O país é ${answer.name}`);
-            lose = true;
+        if (localStorage.attempts > 5) {
+            changeMessage(`Fim de jogo! O país é ${answer.name}. Recarregue a página para jogar mais uma vez.`);
+            return;
         }
+
+        localStorage.setItem("attempts", Number(answer.attempts) + 1);
+        console.log(localStorage.getItem("attempts"));
         
         // Limpando o que ficou do localStorage
         Object.keys(answer).map(key => { if (!Object.keys(country).includes(key)) delete answer[key] });
@@ -112,11 +121,6 @@ class GUI {
                 fieldColors[key] = colors.right;
                 continue;
             }
-
-            if(lose) {
-                fieldColors[key] = colors.default;
-                continue;
-            }
             
             if(key == "hemisphere" || key == "continent") {
                 (country[key] == answer[key]) ? fieldColors[key] = colors.right : fieldColors[key] = colors.wrong;
@@ -143,15 +147,15 @@ class GUI {
             fieldColors[key] = colors.default;
         }
 
-        //console.log(fieldColors);
-
         delete country["name"];
-        
-        printCountry(fieldColors, country);
-        localStorage.setItem("attempts", Number(answer.attempts) + 1);
 
-        if(lose) {
-            printCountry(answer);
+        printCountry(fieldColors, country);
+
+        if (localStorage.attempts > 5 && !win) {
+            changeMessage(`Fim de jogo! O país é ${answer.name}`);
+            lose = true;
+            winColors = fieldColors.keys().map((key) => fieldColors[key] = colors.right);
+            printCountry(winColors, answer);
         }
     }
 
@@ -275,14 +279,13 @@ class GUI {
         let listInput = document.querySelector("#selected-country");
         let country = listInput.value;
         listInput.value = "";
-        console.log(localStorage.getItem("attempts"));
 
         if(!country.trim().length) console.error("País vazio");
         this.dbAction(country, DB_Actions.GET);
     }
 
     init() {        
-        localStorage.setItem("attempts", 0);
+        localStorage.setItem("attempts", "0");
         let dbExists = localStorage.getItem("hasList");
         if(!dbExists) {
             this.fetchAllCountries();
