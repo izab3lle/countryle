@@ -84,7 +84,8 @@ class GUI {
             try {
                 c[0].remove();
             } catch(er) {
-                console.error(err);
+                console.error(er.message);
+                changeMessage("O país já foi escolhido anteriormente!");
             }
         }
         
@@ -181,7 +182,7 @@ class GUI {
         let compare = this.showCountry.bind(this);
         
         let openRequest = indexedDB.open("countries", 1);
-        openRequest.onupgradeneeded = function () {
+        openRequest.onupgradeneeded = function (event) {
             let db = openRequest.result;
             switch (event.oldVersion) {
                 case 0:
